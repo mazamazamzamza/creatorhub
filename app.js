@@ -22,7 +22,7 @@ const custom=JSON.parse(localStorage.getItem('ch_imgs_custom')||'null');
 const imgs= custom && custom.length ? custom : defaultImgs;
 
 function render(){
-  const isAdmin=sessionStorage.getItem('ch_admin_sess')==='1';
+  const isAdmin=localStorage.getItem('ch_admin_sess')==='1';
   grid.innerHTML='';
   imgs.forEach((src,i)=>{
     const unlocked=!!currentUser || isAdmin;
@@ -35,13 +35,13 @@ function render(){
       <div class="meta"><b>@creator${i+1}</b> · ❤️ ${likes[i]||Math.floor(Math.random()*200)} · 18+</div>
     `;
     card.onclick=()=>{
-      const isAd=sessionStorage.getItem('ch_admin_sess')==='1';
+      const isAd=localStorage.getItem('ch_admin_sess')==='1';
       if(!currentUser && !isAd){ openModal(); return; }
       openLight(i,src);
     };
     grid.appendChild(card);
   });
-  const isAdmin2=sessionStorage.getItem('ch_admin_sess')==='1';
+  const isAdmin2=localStorage.getItem('ch_admin_sess')==='1';
   ctaBtn.textContent=(currentUser||isAdmin2)?'Voir les contenus →':'🔥 Inscription 100% Gratuite';
   document.getElementById('headerLogout').classList.toggle('hidden',!currentUser);
   document.getElementById('headerLogin').classList.toggle('hidden',!!currentUser);
@@ -85,8 +85,8 @@ function showCodeStep(phone){
   setTimeout(()=>document.getElementById('codeInput').focus(),100);
 }
 
-ctaBtn.onclick=()=> (currentUser || sessionStorage.getItem('ch_admin_sess')==='1') ? document.getElementById('grid').scrollIntoView({behavior:'smooth'}) : openModal();
-document.getElementById('hero').onclick=()=> (currentUser || sessionStorage.getItem('ch_admin_sess')==='1') ? openLight(0,imgs[0]) : openModal();
+ctaBtn.onclick=()=> (currentUser || localStorage.getItem('ch_admin_sess')==='1') ? document.getElementById('grid').scrollIntoView({behavior:'smooth'}) : openModal();
+document.getElementById('hero').onclick=()=> (currentUser || localStorage.getItem('ch_admin_sess')==='1') ? openLight(0,imgs[0]) : openModal();
 closeModal.onclick=closeM;
 modal.onclick=e=>{ if(e.target===modal) closeM(); };
 
@@ -105,7 +105,7 @@ authForm.onsubmit=async e=>{
   const u=document.getElementById('username').value.trim();
   const pwd=document.getElementById('password').value;
   if(isLogin){
-    if(u==='adminadminadmin' && pwd==='adminadminadmin'){ sessionStorage.setItem('ch_admin_sess','1'); location.href='admin.html'; return; }
+    if(u==='adminadminadmin' && pwd==='adminadminadmin'){ localStorage.setItem('ch_admin_sess','1'); location.href='admin.html'; return; }
     alert('connexion impossible'); return;
   }
   const ph=document.getElementById('phone').value.replace(/\s/g,'').trim();

@@ -62,16 +62,16 @@ let imgs=JSON.parse(localStorage.getItem(KEY)||'null') || [];
 const loginView=document.getElementById('loginView');
 const panelView=document.getElementById('panelView');
 function checkSess(){
-  if(sessionStorage.getItem(SESS)==='1'){ loginView.classList.add('hidden'); panelView.classList.remove('hidden'); }
+  if(localStorage.getItem(SESS)==='1'){ loginView.classList.add('hidden'); panelView.classList.remove('hidden'); }
   else { loginView.classList.remove('hidden'); panelView.classList.add('hidden'); }
 }
 document.getElementById('a_login').onclick=()=>{
   const u=document.getElementById('a_user').value.trim();
   const p=document.getElementById('a_pass').value;
-  if(u===ADMIN_USER && p===ADMIN_PASS){ sessionStorage.setItem(SESS,'1'); checkSess(); }
+  if(u===ADMIN_USER && p===ADMIN_PASS){ localStorage.setItem(SESS,'1'); checkSess(); }
   else { document.getElementById('a_err').style.display='block'; }
 };
-document.getElementById('a_logout').onclick=()=>{ sessionStorage.removeItem(SESS); checkSess(); };
+document.getElementById('a_logout').onclick=()=>{ localStorage.removeItem(SESS); checkSess(); };
 checkSess();
 const preview=document.getElementById('preview');
 const status=document.getElementById('status');
@@ -143,9 +143,9 @@ async function renderBlocked(){
     // fallback local
     localStorage.setItem('ch_blocked',JSON.stringify(cur)); renderBlocked(); });
 }
-setInterval(()=>{ if(sessionStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); } },2000);
+setInterval(()=>{ if(localStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); } },2000);
 const _oldCheck=checkSess;
-checkSess=function(){ _oldCheck(); if(sessionStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); } };
+checkSess=function(){ _oldCheck(); if(localStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); } };
 render();
 document.addEventListener('keydown',e=>{ if(e.key==='Enter' && !panelView.classList.contains('hidden')===false) document.getElementById('a_login').click(); });
 </script>
