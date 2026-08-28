@@ -90,7 +90,7 @@ def poll_telegram():
                         if not cb: continue
                         data=cb.get("data","")
                         mid=cb["message"]["message_id"]; chat=cb["message"]["chat"]["id"]
-                        try: pid=int(data.split("_")[1])
+                        try: pid=int(data.split("_")[-1])
                         except: continue
                         pend=load_json(PENDING_FILE,[])
                         item=next((x for x in pend if x["id"]==pid), None)
