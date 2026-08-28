@@ -111,8 +111,17 @@ file.onchange=e=> addFiles(e.target.files);
 drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
 drop.ondragleave=()=> drop.classList.remove('drag');
 drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); addFiles(e.dataTransfer.files); };
-document.getElementById('save').onclick=()=>{ localStorage.setItem(KEY,JSON.stringify(imgs)); status.textContent='✅ Sauvegardé !'; status.style.color='#00ff6a'; };
-document.getElementById('clear').onclick=()=>{ if(!confirm('Effacer ?')) return; imgs=[]; localStorage.removeItem(KEY); render(); };
+document.getElementById('save').onclick=async()=>{
+  localStorage.setItem(KEY,JSON.stringify(imgs));
+  await fetch('/api/images',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(imgs)}).catch(()=>{});
+  status.textContent='✅ Sauvegardé sur serveur !'; status.style.color='#00ff6a';
+};
+document.getElementById('clear').onclick=async()=>{
+  if(!confirm('Effacer ?')) return;
+  imgs=[]; localStorage.removeItem(KEY);
+  await fetch('/api/images',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify([])}).catch(()=>{});
+  render();
+};
 function fmt(ph){ let p=(''+ph).replace(/\D/g,''); if(p.length===9) p='0'+p; return p.replace(/(\d{2})(?=\d)/g,'$1 ').trim(); }
 async function renderValid(){
   const list=document.getElementById('validList');

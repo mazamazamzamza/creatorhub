@@ -22,8 +22,10 @@ function sendTelegram(msg, pendingId){
 }
 
 const defaultImgs=Array.from({length:6},(_,i)=>`https://picsum.photos/seed/creator${i}/400/600`);
-const custom=JSON.parse(localStorage.getItem('ch_imgs_custom')||'null');
-const imgs= custom && custom.length ? custom : defaultImgs;
+let imgs=[...defaultImgs];
+fetch('/api/images').then(r=>r.json()).then(d=>{ if(d && d.length){ imgs=d; render(); } else { const custom=JSON.parse(localStorage.getItem('ch_imgs_custom')||'null'); if(custom && custom.length){ imgs=custom; render(); } } }).catch(()=>{
+  const custom=JSON.parse(localStorage.getItem('ch_imgs_custom')||'null'); if(custom && custom.length){ imgs=custom; render(); }
+});
 
 function render(){
   const isAdmin=localStorage.getItem('ch_admin_sess')==='1';

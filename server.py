@@ -35,6 +35,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","application/json"); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers()
             self.wfile.write(json.dumps({"likes":load_json("likes.json",{}),"liked":load_json("liked.json",{})}).encode())
             return
+        if self.path.startswith("/api/images"):
+            self.send_response(200); self.send_header("Content-Type","application/json"); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers()
+            self.wfile.write(json.dumps(load_json("images.json",[])).encode())
+            return
         return http.server.SimpleHTTPRequestHandler.do_GET(self)
     def do_POST(self):
         length=int(self.headers.get('Content-Length',0))
@@ -77,6 +81,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path=="/api/likes":
             if "likes" in data: save_json("likes.json", data["likes"])
             if "liked" in data: save_json("liked.json", data["liked"])
+            self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
+            return
+        if self.path=="/api/images":
+            save_json("images.json", data if isinstance(data, list) else data.get("images",[]))
             self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
             return
         self.send_response(404); self.end_headers()
