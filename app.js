@@ -138,6 +138,7 @@ authForm.onsubmit=async e=>{
 
 function doLogout(){
   localStorage.removeItem('ch_user_v2');
+  localStorage.removeItem('ch_admin_sess');
   currentUser=null; closeM(); render();
 }
 document.getElementById('logout').onclick=doLogout;
