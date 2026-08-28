@@ -120,5 +120,6 @@ def poll_telegram():
         time.sleep(2)
 
 threading.Thread(target=poll_telegram, daemon=True).start()
-print("Server on 8000 with Telegram polling")
-http.server.test(HandlerClass=Handler, port=8000)
+port=int(os.environ.get("PORT", 8000))
+print(f"Server on {port} with Telegram polling")
+http.server.test(HandlerClass=Handler, port=port)
