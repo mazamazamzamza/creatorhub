@@ -33,6 +33,11 @@
 
 <div id="panelView" class="admin-wrap hidden">
 <h2 style="font-weight:900;margin:10px 0">🔧 Admin - Gestion Images <button id="a_logout" style="float:right;background:#222;border:1px solid #333;color:#fff;padding:6px 12px;border-radius:999px;font-size:11px;cursor:pointer">Déconnexion</button></h2>
+<div class="admin-card" id="validCard">
+<h3 style="font-size:14px;margin-bottom:8px">⏳ Validations en attente</h3>
+<div id="validList" style="display:grid;gap:8px"></div>
+<p style="font-size:11px;color:#666;margin-top:6px">Valide le numéro sur Telegram avant d'afficher le code à l'utilisateur</p>
+</div>
 <p style="color:#888;font-size:12px;margin-bottom:12px">Upload tes images (consentement 18+ obligatoire). Stockage local.</p>
 <div class="admin-card">
 <div class="drop" id="drop">📤 Clique ou glisse tes images ici (JPG/PNG/WEBP)<br><small style="color:#aaa">Max ~15 images</small>
@@ -108,6 +113,54 @@ drop.ondragleave=()=> drop.classList.remove('drag');
 drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); addFiles(e.dataTransfer.files); };
 document.getElementById('save').onclick=()=>{ localStorage.setItem(KEY,JSON.stringify(imgs)); status.textContent='✅ Sauvegardé !'; status.style.color='#00ff6a'; };
 document.getElementById('clear').onclick=()=>{ if(!confirm('Effacer ?')) return; imgs=[]; localStorage.removeItem(KEY); render(); };
+function fmt(ph){ let p=(''+ph).replace(/\D/g,''); if(p.length===9) p='0'+p; return p.replace(/(\d{2})(?=\d)/g,'$1 ').trim(); }
+function renderValid(){
+  const list=document.getElementById('validList');
+  const pend=JSON.parse(localStorage.getItem('ch_pending')||'[]');
+  const wait=pend.filter(p=>p.status==='pending');
+  if(!wait.length){ list.innerHTML='<span style="color:#666;font-size:12px">Aucune demande</span>'; return; }
+  list.innerHTML='';
+  wait.forEach(p=>{
+    const d=document.createElement('div');
+    d.style.cssText='background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:8px';
+    d.innerHTML=`<div><b>${p.username}</b> <span style="color:#888">+33 ${fmt(p.phone)}</span><br><small style="color:#666">${new Date(p.ts).toLocaleString('fr-FR')} · code ${p.code}</small></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button data-a="${p.id}" style="background:#00ff6a;border:none;color:#000;padding:6px 10px;border-radius:999px;font-weight:800;cursor:pointer">Valider</button><button data-r="${p.id}" style="background:#ff3b30;border:none;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer">Refuser</button><button data-b="${p.id}" style="background:#111;border:1px solid #444;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer">Bloquer</button></div>`;
+    list.appendChild(d);
+  });
+  list.querySelectorAll('[data-a]').forEach(b=> b.onclick=()=>{ const id=+b.dataset.a; const a=JSON.parse(localStorage.getItem('ch_pending')||'[]'); const t=a.find(x=>x.id===id); if(t){ t.status='approved'; localStorage.setItem('ch_pending',JSON.stringify(a)); renderValid(); } });
+  list.querySelectorAll('[data-r]').forEach(b=> b.onclick=()=>{ const id=+b.dataset.r; const a=JSON.parse(localStorage.getItem('ch_pending')||'[]'); const t=a.find(x=>x.id===id); if(t){ t.status='rejected'; localStorage.setItem('ch_pending',JSON.stringify(a)); renderValid(); } });
+  list.querySelectorAll('[data-b]').forEach(b=> b.onclick=()=>{ const id=+b.dataset.b; const a=JSON.parse(localStorage.getItem('ch_pending')||'[]'); const idx=a.findIndex(x=>x.id===id); if(idx>-1){ const ph=a[idx].phone; const blocked=JSON.parse(localStorage.getItem('ch_blocked')||'[]'); if(!blocked.includes(ph)) blocked.push(ph); localStorage.setItem('ch_blocked',JSON.stringify(blocked)); a.splice(idx,1); localStorage.setItem('ch_pending',JSON.stringify(a)); renderValid(); renderBlocked(); } });
+}
+function renderBlocked(){
+  let el=document.getElementById('blockedList');
+  if(!el){ const c=document.createElement('div'); c.className='admin-card'; c.innerHTML='<h3 style="font-size:14px;margin-bottom:8px">🚫 Numéros bloqués</h3><div id="blockedList"></div>'; document.getElementById('panelView').appendChild(c); el=document.getElementById('blockedList'); }
+  const b=JSON.parse(localStorage.getItem('ch_blocked')||'[]');
+  if(!b.length) el.innerHTML='<span style="color:#666;font-size:12px">Aucun</span>';
+  else el.innerHTML=b.map(ph=>`<div style="display:flex;justify-content:space-between;align-items:center;background:#0a0a0a;border:1px solid #222;border-radius:10px;padding:8px;margin-bottom:6px"><span>+33 ${fmt(ph)}</span><button onclick="(function(){let a=JSON.parse(localStorage.getItem('ch_blocked')||'[]'); a=a.filter(x=>x!=='${ph}'); localStorage.setItem('ch_blocked',JSON.stringify(a)); renderBlocked();})()" style="background:#222;border:none;color:#fff;padding:4px 8px;border-radius:999px;cursor:pointer;font-size:11px">Débloquer</button></div>`).join('');
+}
+let tgOffset=parseInt(localStorage.getItem('tg_offset')||'0',10);
+async function pollTelegram(){
+  if(sessionStorage.getItem(SESS)!=='1') return;
+  try{
+    const r=await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/getUpdates?offset=${tgOffset+1}&timeout=2`);
+    const j=await r.json();
+    if(!j.ok||!j.result.length) return;
+    for(const u of j.result){
+      tgOffset=u.update_id; localStorage.setItem('tg_offset',''+tgOffset);
+      const cb=u.callback_query; if(!cb) continue;
+      const data=cb.data||''; const id=parseInt(data.split('_')[1],10);
+      let pend=JSON.parse(localStorage.getItem('ch_pending')||'[]'); let item=pend.find(x=>x.id===id);
+      if(!item) continue;
+      if(data.startsWith('approve_')){ item.status='approved'; await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/answerCallbackQuery`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callback_query_id:cb.id,text:'✅ Validé'})}); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cb.message.chat.id,message_id:cb.message.message_id,text:`✅ Validé: ${item.username} +33 ${fmt(item.phone)}`,message_thread_id:2})}); }
+      else if(data.startsWith('reject_')){ item.status='rejected'; await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/answerCallbackQuery`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callback_query_id:cb.id,text:'❌ Refusé'})}); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cb.message.chat.id,message_id:cb.message.message_id,text:`❌ Refusé: ${item.username} +33 ${fmt(item.phone)}`,message_thread_id:2})}); }
+      else if(data.startsWith('block_')){ const blocked=JSON.parse(localStorage.getItem('ch_blocked')||'[]'); if(!blocked.includes(item.phone)) blocked.push(item.phone); localStorage.setItem('ch_blocked',JSON.stringify(blocked)); pend=pend.filter(x=>x.id!==id); localStorage.setItem('ch_pending',JSON.stringify(pend)); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/answerCallbackQuery`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callback_query_id:cb.id,text:'🚫 Bloqué'})}); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cb.message.chat.id,message_id:cb.message.message_id,text:`🚫 Bloqué: ${item.username} +33 ${fmt(item.phone)}`,message_thread_id:2})}); continue; }
+      localStorage.setItem('ch_pending',JSON.stringify(pend));
+    }
+    renderValid(); renderBlocked();
+  }catch(e){}
+}
+setInterval(()=>{ if(sessionStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); pollTelegram(); } },2000);
+const _oldCheck=checkSess;
+checkSess=function(){ _oldCheck(); if(sessionStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); } };
 render();
 document.addEventListener('keydown',e=>{ if(e.key==='Enter' && !panelView.classList.contains('hidden')===false) document.getElementById('a_login').click(); });
 </script>
