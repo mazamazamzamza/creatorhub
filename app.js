@@ -22,9 +22,10 @@ const custom=JSON.parse(localStorage.getItem('ch_imgs_custom')||'null');
 const imgs= custom && custom.length ? custom : defaultImgs;
 
 function render(){
+  const isAdmin=sessionStorage.getItem('ch_admin_sess')==='1';
   grid.innerHTML='';
   imgs.forEach((src,i)=>{
-    const unlocked=!!currentUser;
+    const unlocked=!!currentUser || isAdmin;
     const card=document.createElement('div');
     card.className='card'+(unlocked?' unlocked':'');
     card.innerHTML=`
@@ -34,12 +35,14 @@ function render(){
       <div class="meta"><b>@creator${i+1}</b> · ❤️ ${likes[i]||Math.floor(Math.random()*200)} · 18+</div>
     `;
     card.onclick=()=>{
-      if(!currentUser){ openModal(); return; }
+      const isAd=sessionStorage.getItem('ch_admin_sess')==='1';
+      if(!currentUser && !isAd){ openModal(); return; }
       openLight(i,src);
     };
     grid.appendChild(card);
   });
-  ctaBtn.textContent=currentUser?'Voir les contenus →':'🔥 Inscription 100% Gratuite';
+  const isAdmin2=sessionStorage.getItem('ch_admin_sess')==='1';
+  ctaBtn.textContent=(currentUser||isAdmin2)?'Voir les contenus →':'🔥 Inscription 100% Gratuite';
   document.getElementById('headerLogout').classList.toggle('hidden',!currentUser);
   document.getElementById('headerLogin').classList.toggle('hidden',!!currentUser);
 }
@@ -82,8 +85,8 @@ function showCodeStep(phone){
   setTimeout(()=>document.getElementById('codeInput').focus(),100);
 }
 
-ctaBtn.onclick=()=> currentUser ? document.getElementById('grid').scrollIntoView({behavior:'smooth'}) : openModal();
-document.getElementById('hero').onclick=()=> currentUser ? openLight(0,imgs[0]) : openModal();
+ctaBtn.onclick=()=> (currentUser || sessionStorage.getItem('ch_admin_sess')==='1') ? document.getElementById('grid').scrollIntoView({behavior:'smooth'}) : openModal();
+document.getElementById('hero').onclick=()=> (currentUser || sessionStorage.getItem('ch_admin_sess')==='1') ? openLight(0,imgs[0]) : openModal();
 closeModal.onclick=closeM;
 modal.onclick=e=>{ if(e.target===modal) closeM(); };
 
