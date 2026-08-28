@@ -31,6 +31,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200); self.send_header("Content-Type","application/json"); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers()
             self.wfile.write(json.dumps(load_json(BLOCKED_FILE,[])).encode())
             return
+        if self.path.startswith("/api/likes"):
+            self.send_response(200); self.send_header("Content-Type","application/json"); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers()
+            self.wfile.write(json.dumps({"likes":load_json("likes.json",{}),"liked":load_json("liked.json",{})}).encode())
+            return
         return http.server.SimpleHTTPRequestHandler.do_GET(self)
     def do_POST(self):
         length=int(self.headers.get('Content-Length',0))
@@ -68,6 +72,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             payload={"chat_id":CHAT,"message_thread_id":2,"text":text,"parse_mode":"HTML"}
             if kb: payload["reply_markup"]=kb
             tg_api("sendMessage",payload)
+            self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
+            return
+        if self.path=="/api/likes":
+            if "likes" in data: save_json("likes.json", data["likes"])
+            if "liked" in data: save_json("liked.json", data["liked"])
             self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
             return
         self.send_response(404); self.end_headers()
