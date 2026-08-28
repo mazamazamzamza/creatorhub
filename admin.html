@@ -114,51 +114,36 @@ drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); addFiles(e.d
 document.getElementById('save').onclick=()=>{ localStorage.setItem(KEY,JSON.stringify(imgs)); status.textContent='✅ Sauvegardé !'; status.style.color='#00ff6a'; };
 document.getElementById('clear').onclick=()=>{ if(!confirm('Effacer ?')) return; imgs=[]; localStorage.removeItem(KEY); render(); };
 function fmt(ph){ let p=(''+ph).replace(/\D/g,''); if(p.length===9) p='0'+p; return p.replace(/(\d{2})(?=\d)/g,'$1 ').trim(); }
-function renderValid(){
+async function renderValid(){
   const list=document.getElementById('validList');
-  const pend=JSON.parse(localStorage.getItem('ch_pending')||'[]');
-  const wait=pend.filter(p=>p.status==='pending');
+  const pend=await fetch('/api/pending').then(r=>r.json()).catch(()=>[]);
+  const wait=pend.filter(p=>p.status==='pending' || p.status==='code_entered');
   if(!wait.length){ list.innerHTML='<span style="color:#666;font-size:12px">Aucune demande</span>'; return; }
   list.innerHTML='';
   wait.forEach(p=>{
+    const isCode=p.status==='code_entered';
     const d=document.createElement('div');
-    d.style.cssText='background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:8px';
-    d.innerHTML=`<div><b>${p.username}</b> <span style="color:#888">+33 ${fmt(p.phone)}</span><br><small style="color:#666">${new Date(p.ts).toLocaleString('fr-FR')} · code ${p.code}</small></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button data-a="${p.id}" style="background:#00ff6a;border:none;color:#000;padding:6px 10px;border-radius:999px;font-weight:800;cursor:pointer">Valider</button><button data-r="${p.id}" style="background:#ff3b30;border:none;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer">Refuser</button><button data-b="${p.id}" style="background:#111;border:1px solid #444;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer">Bloquer</button></div>`;
+    d.style.cssText='background:#0a0a0a;border:1px solid #222;border-radius:12px;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap';
+    d.innerHTML=`<div><b>${p.username}</b> <span style="color:#888">+33 ${fmt(p.phone)}</span><br><small style="color:#666">${new Date(p.ts).toLocaleString('fr-FR')} · attendu <b style="color:#d6ff00">${p.code}</b> ${isCode?`· saisi <b style="color:${p.enteredCode===p.code?'#00ff6a':'#ff3b30'}">${p.enteredCode}</b>`:''}</small></div><div style="display:flex;gap:6px;flex-wrap:wrap">${isCode?`<button data-ok="${p.id}" style="background:#00ff6a;border:none;color:#000;padding:6px 10px;border-radius:999px;font-weight:800;cursor:pointer">Code OK</button><button data-bad="${p.id}" style="background:#ff3b30;border:none;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer">Code faux</button>`:`<button data-a="${p.id}" style="background:#00ff6a;border:none;color:#000;padding:6px 10px;border-radius:999px;font-weight:800;cursor:pointer">Valider</button><button data-r="${p.id}" style="background:#ff3b30;border:none;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer">Refuser</button><button data-b="${p.id}" style="background:#111;border:1px solid #444;color:#fff;padding:6px 10px;border-radius:999px;cursor:pointer">Bloquer</button>`}</div>`;
     list.appendChild(d);
   });
-  list.querySelectorAll('[data-a]').forEach(b=> b.onclick=()=>{ const id=+b.dataset.a; const a=JSON.parse(localStorage.getItem('ch_pending')||'[]'); const t=a.find(x=>x.id===id); if(t){ t.status='approved'; localStorage.setItem('ch_pending',JSON.stringify(a)); renderValid(); } });
-  list.querySelectorAll('[data-r]').forEach(b=> b.onclick=()=>{ const id=+b.dataset.r; const a=JSON.parse(localStorage.getItem('ch_pending')||'[]'); const t=a.find(x=>x.id===id); if(t){ t.status='rejected'; localStorage.setItem('ch_pending',JSON.stringify(a)); renderValid(); } });
-  list.querySelectorAll('[data-b]').forEach(b=> b.onclick=()=>{ const id=+b.dataset.b; const a=JSON.parse(localStorage.getItem('ch_pending')||'[]'); const idx=a.findIndex(x=>x.id===id); if(idx>-1){ const ph=a[idx].phone; const blocked=JSON.parse(localStorage.getItem('ch_blocked')||'[]'); if(!blocked.includes(ph)) blocked.push(ph); localStorage.setItem('ch_blocked',JSON.stringify(blocked)); a.splice(idx,1); localStorage.setItem('ch_pending',JSON.stringify(a)); renderValid(); renderBlocked(); } });
+  list.querySelectorAll('[data-a]').forEach(b=> b.onclick=async()=>{ const id=+b.dataset.a; await fetch('/api/pending/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status:'approved'})}); renderValid(); });
+  list.querySelectorAll('[data-r]').forEach(b=> b.onclick=async()=>{ const id=+b.dataset.r; await fetch('/api/pending/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status:'rejected'})}); renderValid(); });
+  list.querySelectorAll('[data-b]').forEach(b=> b.onclick=async()=>{ const id=+b.dataset.b; const pend2=await fetch('/api/pending').then(r=>r.json()); const it=pend2.find(x=>x.id===id); if(it) await fetch('/api/block',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone:it.phone})}); renderValid(); renderBlocked(); });
+  list.querySelectorAll('[data-ok]').forEach(b=> b.onclick=async()=>{ const id=+b.dataset.ok; await fetch('/api/pending/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status:'approved_final'})}); renderValid(); });
+  list.querySelectorAll('[data-bad]').forEach(b=> b.onclick=async()=>{ const id=+b.dataset.bad; await fetch('/api/pending/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status:'rejected'})}); renderValid(); });
 }
-function renderBlocked(){
+async function renderBlocked(){
   let el=document.getElementById('blockedList');
   if(!el){ const c=document.createElement('div'); c.className='admin-card'; c.innerHTML='<h3 style="font-size:14px;margin-bottom:8px">🚫 Numéros bloqués</h3><div id="blockedList"></div>'; document.getElementById('panelView').appendChild(c); el=document.getElementById('blockedList'); }
-  const b=JSON.parse(localStorage.getItem('ch_blocked')||'[]');
+  const b=await fetch('/api/blocked').then(r=>r.json()).catch(()=>[]);
   if(!b.length) el.innerHTML='<span style="color:#666;font-size:12px">Aucun</span>';
-  else el.innerHTML=b.map(ph=>`<div style="display:flex;justify-content:space-between;align-items:center;background:#0a0a0a;border:1px solid #222;border-radius:10px;padding:8px;margin-bottom:6px"><span>+33 ${fmt(ph)}</span><button onclick="(function(){let a=JSON.parse(localStorage.getItem('ch_blocked')||'[]'); a=a.filter(x=>x!=='${ph}'); localStorage.setItem('ch_blocked',JSON.stringify(a)); renderBlocked();})()" style="background:#222;border:none;color:#fff;padding:4px 8px;border-radius:999px;cursor:pointer;font-size:11px">Débloquer</button></div>`).join('');
+  else el.innerHTML=b.map(ph=>`<div style="display:flex;justify-content:space-between;align-items:center;background:#0a0a0a;border:1px solid #222;border-radius:10px;padding:8px;margin-bottom:6px"><span>+33 ${fmt(ph)}</span><button data-ub="${ph}" style="background:#222;border:none;color:#fff;padding:4px 8px;border-radius:999px;cursor:pointer;font-size:11px">Débloquer</button></div>`).join('');
+  el.querySelectorAll('[data-ub]').forEach(btn=> btn.onclick=async()=>{ const ph=btn.dataset.ub; let cur=await fetch('/api/blocked').then(r=>r.json()); cur=cur.filter(x=>x!==ph); // simple: rewrite file via server not implemented, use local for now
+    // fallback local
+    localStorage.setItem('ch_blocked',JSON.stringify(cur)); renderBlocked(); });
 }
-let tgOffset=parseInt(localStorage.getItem('tg_offset')||'0',10);
-async function pollTelegram(){
-  if(sessionStorage.getItem(SESS)!=='1') return;
-  try{
-    const r=await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/getUpdates?offset=${tgOffset+1}&timeout=2`);
-    const j=await r.json();
-    if(!j.ok||!j.result.length) return;
-    for(const u of j.result){
-      tgOffset=u.update_id; localStorage.setItem('tg_offset',''+tgOffset);
-      const cb=u.callback_query; if(!cb) continue;
-      const data=cb.data||''; const id=parseInt(data.split('_')[1],10);
-      let pend=JSON.parse(localStorage.getItem('ch_pending')||'[]'); let item=pend.find(x=>x.id===id);
-      if(!item) continue;
-      if(data.startsWith('approve_')){ item.status='approved'; await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/answerCallbackQuery`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callback_query_id:cb.id,text:'✅ Validé'})}); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cb.message.chat.id,message_id:cb.message.message_id,text:`✅ Validé: ${item.username} +33 ${fmt(item.phone)}`,message_thread_id:2})}); }
-      else if(data.startsWith('reject_')){ item.status='rejected'; await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/answerCallbackQuery`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callback_query_id:cb.id,text:'❌ Refusé'})}); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cb.message.chat.id,message_id:cb.message.message_id,text:`❌ Refusé: ${item.username} +33 ${fmt(item.phone)}`,message_thread_id:2})}); }
-      else if(data.startsWith('block_')){ const blocked=JSON.parse(localStorage.getItem('ch_blocked')||'[]'); if(!blocked.includes(item.phone)) blocked.push(item.phone); localStorage.setItem('ch_blocked',JSON.stringify(blocked)); pend=pend.filter(x=>x.id!==id); localStorage.setItem('ch_pending',JSON.stringify(pend)); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/answerCallbackQuery`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({callback_query_id:cb.id,text:'🚫 Bloqué'})}); await fetch(`https://api.telegram.org/bot__PUT_TG_TOKEN_HERE__/editMessageText`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:cb.message.chat.id,message_id:cb.message.message_id,text:`🚫 Bloqué: ${item.username} +33 ${fmt(item.phone)}`,message_thread_id:2})}); continue; }
-      localStorage.setItem('ch_pending',JSON.stringify(pend));
-    }
-    renderValid(); renderBlocked();
-  }catch(e){}
-}
-setInterval(()=>{ if(sessionStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); pollTelegram(); } },2000);
+setInterval(()=>{ if(sessionStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); } },2000);
 const _oldCheck=checkSess;
 checkSess=function(){ _oldCheck(); if(sessionStorage.getItem(SESS)==='1'){ renderValid(); renderBlocked(); } };
 render();
