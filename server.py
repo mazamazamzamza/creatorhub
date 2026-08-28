@@ -1,8 +1,11 @@
-import http.server, json, os, time, threading, urllib.request, urllib.parse
+import http.server, json, os, time, threading, urllib.request, urllib.parse, base64
 from urllib.request import urlopen, Request
+SUPA_URL=os.environ.get("SUPA_URL","https://mdqnedaipzdsivpwgxxn.supabase.co")
+SUPA_KEY=os.environ.get("SUPA_SERVICE_KEY","__PUT_SUPA_SERVICE_KEY__")
+SUPA_BUCKET="creatorhub"
 
-TOKEN=os.environ.get("TG_TOKEN","8614076867:AAGAOpdy6Zwr6j-EHkQAUSiOnggXicPxsBQ")
-CHAT=os.environ.get("TG_CHAT","-1004318289180")
+TOKEN=os.environ.get("TG_TOKEN","__PUT_TG_TOKEN__")
+CHAT=os.environ.get("TG_CHAT","__PUT_TG_CHAT__")
 PENDING_FILE="pending.json"
 BLOCKED_FILE="blocked.json"
 OFFSET_FILE="tg_offset.txt"
@@ -84,8 +87,29 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
             return
         if self.path=="/api/images":
-            save_json("images.json", data if isinstance(data, list) else data.get("images",[]))
-            self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
+            imgs=data if isinstance(data, list) else data.get("images",[])
+            urls=[]
+            for i,img in enumerate(imgs):
+                if isinstance(img,str) and img.startswith("http"):
+                    urls.append(img)
+                elif isinstance(img,str) and img.startswith("data:"):
+                    try:
+                        header, b64=img.split(",",1)
+                        ext="jpg"
+                        if "png" in header: ext="png"
+                        elif "webp" in header: ext="webp"
+                        fname=f"{int(time.time()*1000)}_{i}.{ext}"
+                        raw=base64.b64decode(b64)
+                        req=Request(f"{SUPA_URL}/storage/v1/object/{SUPA_BUCKET}/{fname}", data=raw, headers={"apikey":SUPA_KEY,"Authorization":f"Bearer {SUPA_KEY}","Content-Type":f"image/{ext}","x-upsert":"true"})
+                        with urlopen(req) as r: pass
+                        urls.append(f"{SUPA_URL}/storage/v1/object/public/{SUPA_BUCKET}/{fname}")
+                    except Exception as e:
+                        print("supa upload err",e)
+                        urls.append(img)
+                else:
+                    urls.append(img)
+            save_json("images.json", urls)
+            self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(json.dumps({"ok":True,"urls":urls}).encode())
             return
         self.send_response(404); self.end_headers()
     def do_OPTIONS(self):
