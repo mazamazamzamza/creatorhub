@@ -16,11 +16,11 @@ def save_json(p,v):
     with open(p,"w",encoding="utf-8") as f: json.dump(v,f)
 def supa_get(key,default):
     try:
-        req=Request(f"{SUPA_URL}/storage/v1/object/{SUPA_BUCKET}/{key}", headers={"apikey":SUPA_KEY,"Authorization":f"Bearer {SUPA_KEY}"})
+        req=Request(f"{SUPA_URL}/storage/v1/object/public/{SUPA_BUCKET}/{key}?t={int(time.time()*1000)}", headers={"Cache-Control":"no-cache"})
         with urlopen(req, timeout=10) as r: return json.loads(r.read().decode())
     except:
         try:
-            req=Request(f"{SUPA_URL}/storage/v1/object/public/{SUPA_BUCKET}/{key}")
+            req=Request(f"{SUPA_URL}/storage/v1/object/{SUPA_BUCKET}/{key}", headers={"apikey":SUPA_KEY,"Authorization":f"Bearer {SUPA_KEY}","Cache-Control":"no-cache"})
             with urlopen(req, timeout=10) as r: return json.loads(r.read().decode())
         except: return load_json(key.split("/")[-1], default)
 def supa_put(key,data):
