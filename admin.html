@@ -76,16 +76,21 @@ document.getElementById('a_logout').onclick=()=>{ localStorage.removeItem(SESS);
 checkSess();
 const preview=document.getElementById('preview');
 const status=document.getElementById('status');
+async function autoSave(){
+  localStorage.setItem(KEY,JSON.stringify(imgs));
+  status.textContent='⏳ Sauvegarde...'; status.style.color='#d6ff00';
+  try{ await fetch('/api/images',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(imgs)}); status.textContent='✅ Sauvegardé auto sur Supabase'; status.style.color='#00ff6a'; }catch(e){ status.textContent='❌ Erreur sauvegarde'; status.style.color='#ff4d4d'; }
+}
 function render(){
   preview.innerHTML='';
   imgs.forEach((src,i)=>{
     const d=document.createElement('div');
     d.className='p';
     d.innerHTML=`<img src="${src}"><button>✕</button>`;
-    d.querySelector('button').onclick=()=>{ imgs.splice(i,1); render(); };
+    d.querySelector('button').onclick=async()=>{ imgs.splice(i,1); render(); await autoSave(); };
     preview.appendChild(d);
   });
-  status.textContent= imgs.length ? imgs.length+' image(s) en attente' : 'Aucune image custom';
+  status.textContent= imgs.length ? imgs.length+' image(s)' : 'Aucune image custom';
 }
 function addFiles(files){
   const arr=[...files].filter(f=>f.type.startsWith('image/'));
@@ -101,7 +106,7 @@ function addFiles(files){
         if(w>max||h>max){ const s=Math.min(max/w,max/h); w*=s; h*=s; }
         c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
         imgs.push(c.toDataURL('image/jpeg',0.75));
-        pending--; if(pending===0) render();
+        pending--; if(pending===0){ render(); autoSave(); }
       }; img.src=e.target.result;
     }; r.readAsDataURL(f);
   });
@@ -112,11 +117,7 @@ file.onchange=e=> addFiles(e.target.files);
 drop.ondragover=e=>{ e.preventDefault(); drop.classList.add('drag'); };
 drop.ondragleave=()=> drop.classList.remove('drag');
 drop.ondrop=e=>{ e.preventDefault(); drop.classList.remove('drag'); addFiles(e.dataTransfer.files); };
-document.getElementById('save').onclick=async()=>{
-  localStorage.setItem(KEY,JSON.stringify(imgs));
-  await fetch('/api/images',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(imgs)}).catch(()=>{});
-  status.textContent='✅ Sauvegardé sur serveur !'; status.style.color='#00ff6a';
-};
+document.getElementById('save').onclick=autoSave;
 document.getElementById('clear').onclick=async()=>{
   if(!confirm('Effacer ?')) return;
   imgs=[]; localStorage.removeItem(KEY);
