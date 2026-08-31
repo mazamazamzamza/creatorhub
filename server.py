@@ -1,7 +1,7 @@
 import http.server, json, os, time, threading, base64
 from urllib.request import urlopen, Request
-SUPA_URL=os.environ.get("SUPA_URL","https://mdqnedaipzdsivpwgxxn.supabase.co")
-SUPA_KEY=os.environ.get("SUPA_SERVICE_KEY","__PUT_SUPA_SERVICE_KEY__")
+SUPA_URL=os.environ.get("SUPA_URL", os.environ.get("SUPABASE_URL","https://mdqnedaipzdsivpwgxxn.supabase.co"))
+SUPA_KEY=os.environ.get("SUPA_SERVICE_KEY", os.environ.get("SUPA_KEY", os.environ.get("SUPABASE_SERVICE_KEY","__PUT_SUPA_SERVICE_KEY__")))
 SUPA_BUCKET="creatorhub"
 TOKEN=os.environ.get("TG_TOKEN","__PUT_TG_TOKEN__")
 CHAT=os.environ.get("TG_CHAT","__PUT_TG_CHAT__")
@@ -18,7 +18,11 @@ def supa_get(key,default):
     try:
         req=Request(f"{SUPA_URL}/storage/v1/object/{SUPA_BUCKET}/{key}", headers={"apikey":SUPA_KEY,"Authorization":f"Bearer {SUPA_KEY}"})
         with urlopen(req, timeout=10) as r: return json.loads(r.read().decode())
-    except: return load_json(key.split("/")[-1], default)
+    except:
+        try:
+            req=Request(f"{SUPA_URL}/storage/v1/object/public/{SUPA_BUCKET}/{key}")
+            with urlopen(req, timeout=10) as r: return json.loads(r.read().decode())
+        except: return load_json(key.split("/")[-1], default)
 def supa_put(key,data):
     save_json(key.split("/")[-1], data)
     try:
@@ -57,7 +61,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if self.path=="/api/pending/update":
             pend=supa_get("meta/pending.json",[])
             for p in pend:
-                if p["id"]==data.get("id"):
+                if str(p["id"])==str(data.get("id")):
                     for k,v in data.items():
                         if k!="id": p[k]=v
             supa_put("meta/pending.json",pend)
@@ -115,7 +119,7 @@ def poll_telegram():
                         data=cb.get("data",""); mid=cb["message"]["message_id"]; chat=cb["message"]["chat"]["id"]
                         try: pid=int(data.split("_")[-1])
                         except: continue
-                        pend=supa_get("meta/pending.json",[]); item=next((x for x in pend if x["id"]==pid), None)
+                        pend=supa_get("meta/pending.json",[]); item=next((x for x in pend if str(x["id"])==str(pid)), None)
                         if not item: continue
                         if data.startswith("approve_"):
                             item["status"]="approved"; supa_put("meta/pending.json",pend); tg_api("answerCallbackQuery",{"callback_query_id":cb["id"],"text":"✅ Validé"}); tg_api("editMessageText",{"chat_id":chat,"message_id":mid,"message_thread_id":2,"text":f"✅ Validé: {item['username']} +33 {item['phone']}"})
