@@ -38,7 +38,7 @@
 <div id="validList" style="display:grid;gap:8px"></div>
 <p style="font-size:11px;color:#666;margin-top:6px">Valide le numéro sur Telegram avant d'afficher le code à l'utilisateur</p>
 </div>
-<p style="color:#888;font-size:12px;margin-bottom:12px">Upload tes images (consentement 18+ obligatoire). Stockage local.</p>
+<p style="color:#888;font-size:12px;margin-bottom:12px">Upload tes images (consentement 18+ obligatoire). Stockage Supabase (persistant).</p>
 <div class="admin-card">
 <div class="drop" id="drop">📤 Clique ou glisse tes images ici (JPG/PNG/WEBP)<br><small style="color:#aaa">Max ~15 images</small>
 <input type="file" id="file" accept="image/*" multiple hidden>
@@ -58,7 +58,8 @@ const ADMIN_USER='adminadminadmin';
 const ADMIN_PASS='adminadminadmin';
 const KEY='ch_imgs_custom';
 const SESS='ch_admin_sess';
-let imgs=JSON.parse(localStorage.getItem(KEY)||'null') || [];
+let imgs=[];
+fetch('/api/images').then(r=>r.json()).then(d=>{ if(d&&Array.isArray(d)&&d.length){ imgs=d; render(); }}).catch(()=>{ try{ imgs=JSON.parse(localStorage.getItem(KEY)||'null')||[]; render(); }catch(e){}});
 const loginView=document.getElementById('loginView');
 const panelView=document.getElementById('panelView');
 function checkSess(){
